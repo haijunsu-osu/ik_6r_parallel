@@ -282,3 +282,22 @@ For detailed benchmark results, see `BENCHMARK_RESULTS.md`.
 ## References
 
 Based on analytical IK derivation for 6R robots with 3 parallel joints, using DH convention and closed-form solution methods.
+
+## Citation
+
+Cite the paper at
+```bibtex
+@article{SU2026106392,
+title = {Large language model assisted human-AI collaborative development of analytical inverse kinematics solvers for robot manipulators},
+journal = {Mechanism and Machine Theory},
+volume = {222},
+pages = {106392},
+year = {2026},
+issn = {0094-114X},
+doi = {https://doi.org/10.1016/j.mechmachtheory.2026.106392},
+url = {https://www.sciencedirect.com/science/article/pii/S0094114X26000431},
+author = {Hai-Jun Su},
+keywords = {Inverse kinematics, Human-AI collaboration, Robot manipulators, Analytical solvers, Large language models, Prompt engineering},
+abstract = {This paper presents a large language model (LLM) assisted process for developing analytical closed-form inverse kinematics (IK) solvers for robot manipulators. The collaborative workflow enables human experts supervise AI agents through carefully designed prompts, while AI handles all coding, symbolic manipulation, and testing. This division of labor leverages each party’s strengths: human intuition for problem decomposition and strategic guidance versus AI capability for systematic execution of labor-intensive tasks. The methodology comprises two key components: (1) a library of robust helper functions for common trigonometric equation systems, and (2) structured prompts that direct AI agents through derivation, code generation, and validation. Refined prompts significantly reduce iterative exchanges. We demonstrate the methodology on two major 6R robot architectures—spherical wrists and parallel joints—representing over 90% of industrial manipulators. The resulting solvers achieve 100% success rates across 842 industrial robots and 1000 random configurations, with working code produced in minutes rather than weeks. This work establishes a new paradigm where human expertise guides AI execution, significantly reducing development time while maintaining mathematical rigor.}
+}
+```
