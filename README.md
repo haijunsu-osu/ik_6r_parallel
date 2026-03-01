@@ -1,3 +1,10 @@
+## Resources
+
+- Slide deck: [AI-Assisted Analytical Inverse Kinematics](./AI-Assisted_Analytical_Inverse_Kinematics.pdf)
+- Preprint: [IK Solvers Paper (MMT pre-print)](./ik_solvers_paper_MMT_pre-print.pdf)
+- Journal paper: https://doi.org/10.1016/j.mechmachtheory.2026.106392
+- YouTube presentation: https://youtu.be/NhBGTlVRkUw
+
 <<<<<<< HEAD
 # 6R Robot with 3 Parallel Axes - IK Solver Analysis
 
