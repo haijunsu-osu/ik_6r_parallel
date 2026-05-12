@@ -1,0 +1,61 @@
+Context: You are an analytical robotics expert and prompt engineer. The goal of this prompt is to guide an LLM (or autonomous coding agent) to generate a validated, production-quality Python implementation of an analytical inverse kinematics (IK) solver for general 6R serial manipulators whose joint axes 2, 3 and 4 are parallel. Robots follow the Modified Denavit–Hartenberg (MDH) convention. The generated code must be self-contained, numerically robust, and include automated validation tests. Do not assume access to any external repository documents; all instructions below are self-contained.
+
+Task: Generate a Python module named `ik_6r_3parallel_solver.py` that exposes a public function:
+
+- `solve_ik_6r_3parallel(dh_params, target_pose) -> List[Solution]`
+
+where `dh_params` is a structured representation of MDH parameters for the 6 links and `target_pose` is a 4x4 homogeneous transform or equivalent (rotation+translation). The module must implement the full analytical IK pipeline for the architecture where joints 2, 3 and 4 have parallel axes. The module must also provide a self-contained test harness that validates correctness and numerical robustness against synthetic randomized parameter sets that respect the parallel-joint constraint.
+
+Requirements:
+
+1. Architecture-specific derivation: Implement the solver strategy for the parallel-joint family and provide explicit CAS-driven derivation guidance for the two-angle subsystem for `\theta_1` and `\theta_6`:
+
+- Begin by moving the term `^5T_6` (the transformation from frame 5 to 6) to the left-hand side when forming the reduced wrist/hand equations so that the remaining expressions describe the kinematics up to joint 5. This rearrangement simplifies the appearance of `\theta_1` and `\theta_6` in the resulting equations.
+
+- Derive two scalar equations using a CAS (SymPy, Mathematica, or equivalent). The equations must follow these geometric conditions and be manipulated symbolically until they are linear in the trig primitives `c1 = cos(\theta_1)`, `s1 = sin(\theta_1)`, `c6 = cos(\theta_6)`, and `s6 = sin(\theta_6)`:
+	1) The angle between the z-axes of frames 4 and 5 equals the known twist `alpha4` (i.e., z4 · z5 = cos(alpha4)). Use the rotation submatrices to express this relation and expand symbolically.
+	2) The projection constraint: the projection of the vector `P05` onto `z5` computed from the left side (by expressing P05 in frame 5) must equal the projection of `P05` onto `z5` computed from the right side (by expressing the same vector using frame-0/1 variables). Concretely, form the scalar equation `z5^T * P05_left - z5^T * P05_right = 0` and expand symbolically.
+
+- Use a CAS to eliminate all other unknown trig terms and simplify the two scalar equations until they are in the pattern
+
+		A1(c, s) * c6 + B1(c, s) * s6 + C1(c, s) = 0
+		A2(c, s) * c6 + B2(c, s) * s6 + C2(c, s) = 0
+
+	where each coefficient A*, B*, C* is linear in `c1` and `s1` (i.e., of the form p*c1 + q*s1 + r, after symbolic simplification). The final linear-in-(c1,s1,c6,s6) structure is required so the bilinear system can be arranged as a 2x2 linear system in `[c6, s6]` with coefficients affine in `[c1, s1]` (or vice versa), enabling dialytic/bilinear solvers.
+
+- After deriving the symbolic forms, substitute a small numerical example (provide numeric MDH parameters and a sample target pose) and numerically evaluate the left-hand sides to confirm the equations hold and are linear in the intended trig primitives. Include the CAS commands or short script lines used for both symbolic simplification and numeric validation in the generated code comments or helper docstring.
+
+- Once the symbolic forms are validated, hard-code the simplified coefficient expressions (numeric formulas in terms of MDH parameters and target pose entries) into the Python implementation; do not call CAS at runtime. Use the resulting 2×2 bilinear formulation and apply a stable bilinear elimination solver (e.g., build the 2×2 linear system in `[c6,s6]`, compute its determinant polynomial in `c1,s1`, and solve via eigenvalue/resultant reduction or a small polynomial solve) to obtain candidate `(c1,s1,c6,s6)` pairs, then recover angles `\theta_1` and `\theta_6` with `atan2`.
+
+- After obtaining `\theta_1` and `\theta_6` candidates, compute `\theta_5` from orientation/position constraints and then solve the planar 3R subproblem for `\theta_2,\theta_3,\theta_4` using standard cosine-law closed-form formulas.
+
+- Document the CAS steps and show a short numeric validation in the test harness that reproduces the CAS numeric check to ensure the derived linear pattern is correct for the chosen example.
+
+The remainder of the solver (computing `\theta_5` and solving the planar 3R subproblem) should follow the standard approach: compute `\theta_5` by examining reduced orientation entries, then solve the planar 3R position subproblem for `\theta_2,\theta_3,\theta_4` (law of cosines + single-angle helpers). Hard-code simplified numeric coefficient forms at runtime (do not rely on calling a CAS at runtime).
+
+2. Reuse helper solvers: If the environment provides equivalent helper functions, call them; otherwise implement minimal, well-tested replacements in the same module: `solve_trig_eq()`, `solve_trig_sys_single()`, `solve_trig_sys()`, and `solve_bilinear_sys()` (or combine logic into small helper functions). These helpers should return all mathematically valid angle solutions (within numeric tolerances).
+
+3. Preprocessing & normalization: Implement `preprocess_target(dh_params, target_pose)` that normalizes inputs and, when applicable, "absorbs" base/tool offsets into the target pose (so the solver computes joint values for the main chain). Represent MDH parameters as a simple Python `dataclass` or dict with explicit fields: `alpha, a, d, theta_offset` for each link. Normalize returned joint angles to `[-pi, pi]` and provide consistent ordering in output solutions.
+
+4. Numerical robustness: Include conditioning checks and fallbacks for degenerate cases (e.g., `sin(theta5)=0`, rank-deficient bilinear matrices, near-colinear links). Each candidate solution must be validated by forward kinematics; discard solutions whose pose residual exceeds a strict tolerance (e.g., 1e-8 relative or absolute depending on metric). Report residuals for failing cases in test output.
+
+5. Validation tests & datasets: Provide an automated `if __name__ == '__main__'` test harness that runs:
+
+- Deterministic tests using a small set of synthetic canonical examples included in the file (at least three), each constructed to satisfy the parallel-joint constraint.
+- Randomized stress tests that generate `N` random MDH parameter sets constrained so that axes 2,3,4 are parallel (for instance set the appropriate `alpha` values equal or set axis directions directly), and sample reachable target poses. For each random robot, test `M` random reachable target poses and validate the solver recovers matching FK within the tolerance.
+
+Suggested test counts (configurable constants): `N=100` random robots, `M=10` poses per robot for stress; plus `K` deterministic examples (K>=3). Record pass/fail counts and maximum residuals.
+
+6. Performance & reporting: Time per-solve should be measured (single-call median and mean) in the harness and printed in a summary. Document expected runtime scale (e.g., low-milliseconds per solve in Python for typical hardware) and call out possible hotspots that would benefit from C/C++ porting.
+
+7. Code quality & documentation: The generated module must be well-structured, with clear function-level docstrings, explanation of the elimination approach used, and inline TODOs if any repository-specific adapter code is required.
+
+8. Deliver a single-file implementation (plus optional small helper files only if justified) that can be run directly under the repository's Python environment. If external packages are required beyond the standard scientific Python stack (`numpy`, `scipy`), the prompt should request them explicitly and add a short `requirements.txt` snippet.
+
+Deliverables:
+
+- A Python module `ik_6r_3parallel_solver.py` (to be placed at the repository root or specified path) implementing `solve_ik_6r_3parallel(dh_params, target_pose)` and helper routines described above.
+- A test harness included in the same file (under `if __name__ == '__main__'`) that runs the deterministic and randomized validation suites, prints pass/fail counts, maximum residuals, and timing statistics.
+- A concise usage README snippet (3–6 lines) at the top of the file explaining how to run the tests and how to call the API.
+
+
